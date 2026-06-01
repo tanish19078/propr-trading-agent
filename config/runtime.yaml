@@ -1,0 +1,64 @@
+# Propr does not currently expose a separate beta REST domain to public users.
+# Both demo (paper) trading and funded trading run against api.propr.xyz; the
+# distinction is the active challenge attempt's account.type ("paper" vs "book").
+# So we default to "live" here.
+profile: "live"
+
+profiles:
+  beta:
+    # Reserved in case Propr exposes a separate beta domain in the future. Not
+    # currently reachable for normal users.
+    rest_base: "https://api.beta.propr.xyz/v1"
+    propr_ws:  "wss://api.beta.propr.xyz/ws"
+    hyperliquid_ws: "wss://api.hyperliquid.xyz/ws"
+  live:
+    rest_base: "https://api.propr.xyz/v1"
+    propr_ws:  "wss://api.propr.xyz/ws"
+    hyperliquid_ws: "wss://api.hyperliquid.xyz/ws"
+
+limits:
+  # Token bucket. Reserve burst capacity for emergency flattens.
+  normal_rate_per_min: 800
+  reserved_rate_per_min: 400
+
+  # Headroom-based sizing caps, in basis points.
+  max_risk_per_trade_bps: 200        # 2% of equity per trade
+  max_daily_headroom_use_bps: 2500   # at most 25% of remaining daily headroom
+  max_overall_headroom_use_bps: 1000 # at most 10% of remaining overall headroom
+
+  # Kill switch trip thresholds.
+  floating_loss_trip_bps: 7000       # trip at 70% of overall DD consumed
+  daily_loss_trip_bps: 7000          # trip at 70% of daily limit consumed
+
+  # Internal leverage caps, kept BELOW platform max (5x BTC/ETH).
+  max_leverage_btc_eth: 3
+  max_leverage_other_crypto: 2
+
+  # WebSocket disconnect tolerance before blind mode.
+  ws_blind_mode_after_ms: 10000
+
+  # Slippage buffer for marketable-limit entries.
+  slippage_buffer_bps: 20
+
+paths:
+  log_path: "logs/agent.jsonl"
+  journal_path: "logs/journal.db"
+  strategies_dir: "build/strategies"
+
+strategies:
+  - name: "range_mr"
+    # Plugin extension is platform-dependent: .so on Linux/macOS, .dll on Windows.
+    # The loader picks one based on PROPR_PLUGIN_EXT (set in CMakeLists for the
+    # plugin target) — leave the path without extension and the agent appends.
+    plugin_path: "build/strategies/range_mr/range_mr"
+    params_path: "strategies/range_mr/params.yaml"
+    risk_budget_bps: 10000   # 100% - single strategy for now
+    enabled: true
+
+# HMAC secret used to sign OrderCommandV1. Leave blank to mint a fresh per-session
+# secret at boot (recommended). Override via PROPR_HMAC_SECRET env var.
+hmac_secret: ""
+
+# Optional: pin a specific challenge attempt. Leave blank to auto-discover via
+# GET /challenge-attempts?status=active.
+challenge_attempt_id: ""
