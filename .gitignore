@@ -1,0 +1,37 @@
+build/
+out/
+cmake-build-*/
+.vscode/
+.idea/
+*.user
+.DS_Store
+
+# secrets & runtime
+.env
+logs/*
+!logs/.gitkeep
+data/*
+!data/.gitkeep
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+
+# vcpkg
+vcpkg_installed/
+
+# objects, binaries
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.exe
+*.pdb
+
+# python (for scripts/)
+__pycache__/
+*.pyc
+.venv/
