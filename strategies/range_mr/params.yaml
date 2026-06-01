@@ -1,0 +1,18 @@
+# Range mean reversion - boring on purpose.
+# Bollinger fade on BTC perp with a realised-vol gate. Hard stop and hard take-profit.
+# No averaging down. No grids. No "if it goes against me I add more". One entry, one
+# stop, one take-profit, all bracketed on the same orderGroupId.
+
+asset_base: BTC
+bband_window: 200          # ticks; with 1-second ticks ~= 3.3 min lookback
+bband_stdev_x: 100         # std-dev multiplier in basis points (100 = 1.0 stdev)
+take_profit_to_mid_bps: 5  # exit at midband - 0.05% of midband on the favourable side
+hard_stop_outer_band_bps: 50  # stop beyond the outer band by 0.50%
+quantity_nano: 100000      # 0.0001 BTC nominal; risk engine will shrink as needed
+
+# Realised volatility gate: skip new entries when realised vol over the window
+# exceeds this many basis points (per tick). Bollinger fade dies in high-vol regimes.
+realised_vol_max_bps: 35
+
+# Anti-overtrade: minimum ticks between two entries on the same side.
+cooldown_ticks: 60
