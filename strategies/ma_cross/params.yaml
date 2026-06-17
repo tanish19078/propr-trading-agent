@@ -1,0 +1,13 @@
+# ma_cross - the baseline trend strategy. Fast/slow SMA crossover, acting only on
+# the cross event. No breakout confirm, no vol gate. Exists to measure how much the
+# extra machinery in momentum/donchian actually buys.
+
+asset_base: BTC
+
+fast_ma: 50            # ticks
+slow_ma: 200           # ticks (must be > fast_ma)
+stop_bps: 50           # stop distance as bps of entry price (50 = 0.50%)
+tp_to_stop_x: 150      # take-profit as a multiple of stop distance (150 = 1.5R)
+
+quantity_nano: 100000  # 0.0001 BTC nominal; risk engine shrinks as needed
+cooldown_ticks: 30     # minimum ticks between entries
