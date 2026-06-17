@@ -145,6 +145,9 @@ add_subdirectory(app)
 # account and we want offline historical runs.
 # add_subdirectory(backtest)
 add_subdirectory(strategies/range_mr)
+add_subdirectory(strategies/momentum)
+add_subdirectory(strategies/donchian)
+add_subdirectory(strategies/ma_cross)
 
 enable_testing()
 add_subdirectory(tests)
