@@ -1,0 +1,18 @@
+# momentum - trend follower. Rides breakouts confirmed by a fast/slow MA cross.
+# Mirror image of range_mr: it WANTS volatility and trend, and stands aside in
+# dead-flat tape. Fixed reward:risk, one position at a time, no averaging.
+
+asset_base: BTC
+
+fast_ma: 50            # ticks; fast moving average
+slow_ma: 200           # ticks; slow moving average (must be > fast_ma)
+breakout_window: 100   # require price to break the high/low of this many ticks
+
+atr_window: 100        # ticks used for the ATR (mean abs tick move) stop sizing
+atr_stop_x: 200        # stop distance in ATRs, basis points (200 = 2.0 ATR)
+tp_to_stop_x: 150      # take-profit as a multiple of stop distance (150 = 1.5R)
+
+min_vol_bps: 8         # skip entries when realised vol (ATR/price) is below this
+
+quantity_nano: 100000  # 0.0001 BTC nominal; risk engine shrinks as needed
+cooldown_ticks: 30     # minimum ticks between entries
