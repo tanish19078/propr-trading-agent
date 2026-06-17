@@ -1,0 +1,12 @@
+# donchian_breakout - the classic turtle channel breakout. No MA filter; pure
+# break of the N-tick high/low. Wants trend and expansion; chops itself in a range.
+
+asset_base: BTC
+
+channel_window: 200    # entry channel lookback (ticks)
+stop_frac_bps: 5000    # stop distance = this fraction of channel width (5000 = 50%)
+tp_to_stop_x: 200      # take-profit as a multiple of stop distance (200 = 2.0R)
+min_width_bps: 10      # skip when channel is tighter than this (bps of price)
+
+quantity_nano: 100000  # 0.0001 BTC nominal; risk engine shrinks as needed
+cooldown_ticks: 30     # minimum ticks between entries
