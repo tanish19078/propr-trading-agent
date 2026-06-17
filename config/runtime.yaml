@@ -55,6 +55,26 @@ strategies:
     risk_budget_bps: 10000   # 100% - single strategy for now
     enabled: true
 
+  # Additional strategies, scored offline via tests/integration/test_strategy_sim.
+  # Disabled in the live runtime by default — enable one (and drop range_mr's
+  # budget) once the comparison table justifies it. Do NOT run several live at
+  # once until risk_budget_bps is split; they currently each assume 100%.
+  - name: "momentum"
+    plugin_path: "build/strategies/momentum/momentum"
+    params_path: "strategies/momentum/params.yaml"
+    risk_budget_bps: 10000
+    enabled: false
+  - name: "donchian_breakout"
+    plugin_path: "build/strategies/donchian/donchian"
+    params_path: "strategies/donchian/params.yaml"
+    risk_budget_bps: 10000
+    enabled: false
+  - name: "ma_cross"
+    plugin_path: "build/strategies/ma_cross/ma_cross"
+    params_path: "strategies/ma_cross/params.yaml"
+    risk_budget_bps: 10000
+    enabled: false
+
 # HMAC secret used to sign OrderCommandV1. Leave blank to mint a fresh per-session
 # secret at boot (recommended). Override via PROPR_HMAC_SECRET env var.
 hmac_secret: ""
