@@ -40,3 +40,23 @@ add_executable(test_simulator_drill integration/test_simulator_drill.cpp ${TEST_
 target_link_libraries(test_simulator_drill PRIVATE propr_core GTest::gtest GTest::gtest_main)
 target_include_directories(test_simulator_drill PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 gtest_discover_tests(test_simulator_drill)
+
+# Strategy comparison harness: loads the real strategy plugins and scores them
+# across synthetic regimes through the real risk core. Plugin/params paths are
+# injected as compile defs; add_dependencies guarantees the .so files exist first.
+add_executable(test_strategy_sim integration/test_strategy_sim.cpp
+  integration/sim_harness.h ${TEST_FAKES_HEADERS})
+target_link_libraries(test_strategy_sim PRIVATE propr_core GTest::gtest GTest::gtest_main)
+target_include_directories(test_strategy_sim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+add_dependencies(test_strategy_sim range_mr momentum donchian ma_cross)
+target_compile_definitions(test_strategy_sim PRIVATE
+  RANGE_MR_PLUGIN="$<TARGET_FILE:range_mr>"
+  RANGE_MR_PARAMS="${CMAKE_SOURCE_DIR}/strategies/range_mr/params.yaml"
+  MOMENTUM_PLUGIN="$<TARGET_FILE:momentum>"
+  MOMENTUM_PARAMS="${CMAKE_SOURCE_DIR}/strategies/momentum/params.yaml"
+  DONCHIAN_PLUGIN="$<TARGET_FILE:donchian>"
+  DONCHIAN_PARAMS="${CMAKE_SOURCE_DIR}/strategies/donchian/params.yaml"
+  MA_CROSS_PLUGIN="$<TARGET_FILE:ma_cross>"
+  MA_CROSS_PARAMS="${CMAKE_SOURCE_DIR}/strategies/ma_cross/params.yaml"
+)
+gtest_discover_tests(test_strategy_sim)
