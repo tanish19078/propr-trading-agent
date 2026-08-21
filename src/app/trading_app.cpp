@@ -160,6 +160,20 @@ void TradingApp::register_preflight_gates_() {
                  [this] { return !account_.id().value.empty(); },
                  [] { return "no active challenge attempt"; });
 
+  preflight_.add("leverage_limits_loaded",
+                 [this] {
+                   if (platform_max_lev_btc_eth_ <= 0 ||
+                       platform_max_lev_other_ <= 0) {
+                     return false;
+                   }
+                   // Internal caps must sit strictly BELOW the platform max.
+                   return cfg_.limits.max_leverage_btc_eth <
+                              platform_max_lev_btc_eth_ &&
+                          cfg_.limits.max_leverage_other_crypto <
+                              platform_max_lev_other_;
+                 },
+                 [] { return "leverage limits missing or internal cap >= platform cap"; });
+
   preflight_.add("daily_snapshot_present",
                  [this] { return risk_engine_.daily_snapshot() > 0; },
                  [] { return "daily snapshot not set"; });
