@@ -37,5 +37,16 @@ class Strategy {
 
 }  // namespace propr::strategy
 
-extern "C" propr::strategy::Strategy* create_strategy();
-extern "C" void destroy_strategy(propr::strategy::Strategy*);
+// Plugin factories must survive -fvisibility=hidden: without this annotation
+// the symbols stay hidden on ELF platforms and dlsym("create_strategy")
+// returns null while the exact same plugin loads fine on Windows.
+#if defined(_WIN32)
+#define PROPR_PLUGIN_API
+#elif defined(__GNUC__) || defined(__clang__)
+#define PROPR_PLUGIN_API __attribute__((visibility("default")))
+#else
+#define PROPR_PLUGIN_API
+#endif
+
+extern "C" PROPR_PLUGIN_API propr::strategy::Strategy* create_strategy();
+extern "C" PROPR_PLUGIN_API void destroy_strategy(propr::strategy::Strategy*);
