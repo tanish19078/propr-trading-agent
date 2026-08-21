@@ -520,23 +520,25 @@ void TradingApp::tick_() {
     sm_.transition(AppState::Halted);
     running_.store(false, std::memory_order_release);
   }
-  // TODO: WS-disconnect kill switch disabled for now. On quiet paper accounts,
-  // the Propr WS sends no data after connection, causing false positives.
-  // Re-enable once we track account.type and can distinguish paper vs funded.
-  /*
-  if (auto t = kill_switch_.check_ws_disconnect(propr_ws_.last_event_ns(),
-                                                 "propr")) {
-    const auto gap_ms = (clock_.now_ns() - propr_ws_.last_event_ns()) / 1000000;
-    PROPR_LOG_ERROR("WS disconnect check tripped: last_event_ns=" +
-                    std::to_string(propr_ws_.last_event_ns()) +
-                    " now_ns=" + std::to_string(clock_.now_ns()) +
-                    " gap_ms=" + std::to_string(gap_ms));
-    journal_.write_event(t->at_ns, "kill_switch_trip", R"({"reason":"ws"})");
-    bus_.publish(*t);
-    sm_.transition(AppState::Blind);
-    order_manager_.flatten_all(account_);
+  // WS-silence kill switch, armed only while exposure exists. A quiet paper
+  // account legitimately receives no Propr WS traffic for long stretches
+  // (server pings are protocol-level, not messages) - that was the false trip
+  // that killed the 2026-05-30 demo run. With open positions, though, silence
+  // means floating P&L is unmonitored: trip to FLATTENING -> HALTED.
+  if (!account_.open_positions().empty()) {
+    if (auto t = kill_switch_.check_ws_disconnect(propr_ws_.last_event_ns(),
+                                                  "propr")) {
+      const auto gap_ms = (clock_.now_ns() - propr_ws_.last_event_ns()) / 1000000;
+      PROPR_LOG_ERROR("WS silence with open positions: gap_ms=" +
+                      std::to_string(gap_ms));
+      journal_.write_event(t->at_ns, "kill_switch_trip", R"({"reason":"ws"})");
+      bus_.publish(*t);
+      sm_.transition(AppState::Flattening);
+      order_manager_.flatten_all(account_);
+      sm_.transition(AppState::Halted);
+      running_.store(false, std::memory_order_release);
+    }
   }
-  */
 }
 
 void TradingApp::on_event_(core::Event& ev) {
