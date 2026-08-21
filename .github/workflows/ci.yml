@@ -41,7 +41,19 @@ jobs:
         run: cmake --build build -j$(nproc)
 
       - name: Unit + integration tests
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          set -o pipefail
+          ctest --test-dir build --output-on-failure 2>&1 | tee /tmp/ctest_output.txt
+
+      - name: Publish test failures to summary
+        if: failure()
+        run: |
+          {
+            echo "## ctest output"
+            echo '```'
+            grep -v "^\[==========\]" /tmp/ctest_output.txt | tail -n 400
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Kill-switch drill (release gate)
         run: ./build/tests/test_kill_switch_drill
