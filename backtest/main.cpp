@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <string>
 #include <unordered_map>
 
@@ -38,8 +39,8 @@ namespace {
 
 struct Bracket {
   bool is_long{true};
-  core::Price stop{0};
-  core::Price tp{0};
+  propr::core::Price stop{0};
+  propr::core::Price tp{0};
 };
 
 constexpr std::int64_t kDayNs = 86'400LL * 1'000'000'000LL;
@@ -49,12 +50,39 @@ constexpr std::int64_t kDayNs = 86'400LL * 1'000'000'000LL;
 int main(int argc, char** argv) {
   std::string strategy_path, params_path, data_path;
   std::string config_path = "config/runtime.yaml";
+  long long gen_ticks = 0;
+  std::string gen_out;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
     if (a == "--strategy" && i + 1 < argc) strategy_path = argv[++i];
     else if (a == "--params" && i + 1 < argc) params_path = argv[++i];
     else if (a == "--data" && i + 1 < argc) data_path = argv[++i];
     else if (a == "--config" && i + 1 < argc) config_path = argv[++i];
+    else if (a == "--gen-sample" && i + 2 < argc) {
+      gen_ticks = std::stoll(argv[++i]);
+      gen_out = argv[++i];
+    }
+  }
+  if (gen_ticks > 0) {
+    // Deterministic synthetic BTC series: minute bars, regime-switching drift,
+    // prices in micro-USDC. Enough to smoke the harness end-to-end offline.
+    std::mt19937_64 rng(0xC0FFEE);
+    std::normal_distribution<double> noise(0.0, 0.0015);
+    double price = 60000.0;
+    const std::int64_t start_ns = 1'700'000'000LL * 1'000'000'000LL;
+    std::ofstream g(gen_out);
+    g << "ts_ns,base,mark_price\n";
+    for (long long i = 0; i < gen_ticks; ++i) {
+      // Switch drift regime every ~4 hours so trends and ranges both appear.
+      const double drift =
+          ((i / 240) % 2 == 0) ? 0.00004 : -0.00003;
+      price *= (1.0 + drift + noise(rng));
+      if (price < 1000.0) price = 1000.0;
+      g << (start_ns + i * 60LL * 1'000'000'000LL) << ",BTC,"
+        << static_cast<std::int64_t>(price * 1'000'000.0) << "\n";
+    }
+    std::cout << "wrote " << gen_ticks << " ticks -> " << gen_out << "\n";
+    return 0;
   }
   if (strategy_path.empty() || data_path.empty()) {
     std::cerr << "usage: propr_backtest --strategy PATH --params PATH --data CSV "
@@ -146,7 +174,7 @@ int main(int argc, char** argv) {
       const bool tp_crossed =
           b.tp > 0 && (b.is_long ? t.mark_price >= b.tp : t.mark_price <= b.tp);
       if (stop_crossed || tp_crossed) {
-        const core::Price fill = stop_crossed ? b.stop : b.tp;
+        const propr::core::Price fill = stop_crossed ? b.stop : b.tp;
         fake.close(t.asset.base, fill);
         stops_hit += stop_crossed ? 1 : 0;
         tps_hit += tp_crossed ? 1 : 0;

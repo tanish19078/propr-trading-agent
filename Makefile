@@ -7,6 +7,8 @@ BUILD_DIR ?= build
 BUILD_TYPE ?= Release
 VCPKG_TOOLCHAIN ?= $(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake
 PROFILE ?= beta
+DATA ?= data/sample_btc.csv
+PLUGIN_EXT ?= dll
 IMAGE ?= propr-agent
 DOCKER ?= docker
 DOCKER_RUN = $(DOCKER) run --rm -it \
@@ -41,9 +43,10 @@ run: build
 	fi
 	$(BUILD_DIR)/app/propr_agent --config config/runtime.yaml --profile $(PROFILE)
 
-backtest:
-	@echo "Backtest binary is parked while we focus on demo-account validation."
-	@echo "Re-enable add_subdirectory(backtest) in CMakeLists.txt to use it."
+backtest: build
+	$(BUILD_DIR)/backtest/propr_backtest \
+	  --strategy $(BUILD_DIR)/strategies/range_mr/range_mr.$(PLUGIN_EXT) \
+	  --params strategies/range_mr/params.yaml --data $(DATA)
 
 smoke-net: build
 	@test -n "$$PROPR_API_KEY" || (echo "PROPR_API_KEY not set" && exit 1)

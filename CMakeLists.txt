@@ -139,11 +139,7 @@ target_link_libraries(propr_core
 )
 
 add_subdirectory(app)
-# Backtest binary is parked while we focus on demo-account testing. The CSV
-# feeder + fake account compile cleanly, but main.cpp still references the
-# pre-V1 Intent type. Re-enable once range_mr is validated against the demo
-# account and we want offline historical runs.
-# add_subdirectory(backtest)
+add_subdirectory(backtest)
 add_subdirectory(strategies/range_mr)
 add_subdirectory(strategies/momentum)
 add_subdirectory(strategies/donchian)
