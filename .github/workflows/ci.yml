@@ -48,8 +48,9 @@ jobs:
       - name: Publish test failures to summary
         if: failure()
         run: |
-          # Failed-test lines as error annotations (public via checks API).
-          grep -E "\[  FAILED  \]" /tmp/ctest_output.txt | head -n 9 |
+          # Failed/not-run lines as error annotations (public via checks API).
+          grep -E "\[  FAILED  \]|Not Run|tests passed|tests failed" \
+            /tmp/ctest_output.txt | head -n 9 |
             while read -r line; do echo "::error::$line"; done
           {
             echo "## ctest tail"

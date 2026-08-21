@@ -66,10 +66,33 @@ inline const char* regime_name(Regime r) {
 
 using TickSeries = std::vector<schemas::v1::TickV1>;
 
+// ── Platform-stable randomness ───────────────────────────────────────────────
+// std::normal_distribution streams are implementation-defined: MSVC and
+// libstdc++ draw different sequences from the same seed, which silently gave
+// Linux CI a different market than Windows dev boxes. SplitMix64 + Box-Muller
+// is bit-identical on every platform, so "deterministic given seed" actually
+// holds for the harness too.
+
+inline double splitmix64_uniform(std::uint64_t& state) {
+  state += 0x9E3779B97F4A7C15ULL;
+  std::uint64_t z = state;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+  z ^= (z >> 31);
+  return static_cast<double>(z >> 11) * (1.0 / 9007199254740992.0);  // [0, 1)
+}
+
+inline double gauss(std::uint64_t& state) {
+  constexpr double kTwoPi = 6.283185307179586476925286766559;
+  double u1 = splitmix64_uniform(state);
+  const double u2 = splitmix64_uniform(state);
+  if (u1 <= 0.0) u1 = 1e-15;
+  return std::sqrt(-2.0 * std::log(u1)) * std::cos(kTwoPi * u2);
+}
+
 inline TickSeries make_regime(Regime r, std::uint64_t seed, int n = 2000,
                               double start_px = 60'000.0) {
-  std::mt19937_64 rng(seed);
-  std::normal_distribution<double> z(0.0, 1.0);
+  std::uint64_t rng_state = seed ^ 0x51ED270B46D6CA81ULL;
   TickSeries out;
   out.reserve(static_cast<std::size_t>(n));
 
@@ -88,9 +111,9 @@ inline TickSeries make_regime(Regime r, std::uint64_t seed, int n = 2000,
     }
     if (r == Regime::Range) {
       // Ornstein-Uhlenbeck pull toward the center keeps it ranging.
-      px += 0.02 * (center - px) + px * sd * z(rng);
+      px += 0.02 * (center - px) + px * sd * gauss(rng_state);
     } else {
-      px *= (1.0 + drift + sd * z(rng));
+      px *= (1.0 + drift + sd * gauss(rng_state));
     }
     if (px < 1.0) px = 1.0;
 
