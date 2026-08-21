@@ -29,13 +29,14 @@ using namespace propr;
 using propr::core::usdc;
 
 namespace {
-schemas::v1::IntentV1 mk_long_intent(double mark, double stop) {
+schemas::v1::IntentV1 mk_long_intent(double mark, double stop,
+                                     core::Qty qty_nano = 100'000) {
   schemas::v1::IntentV1 i;
   i.intent_uuid = "test_intent";
   i.strategy_name = "drill";
   i.kind = schemas::v1::IntentKindV1::OpenLong;
   i.asset_base = "BTC";
-  i.quantity_nano = 100'000;  // 0.0001 BTC
+  i.quantity_nano = qty_nano;
   i.suggested_entry_price_micro =
       static_cast<core::Price>(mark * core::kMicroPerUnit);
   i.stop_loss_price_micro =
@@ -105,21 +106,36 @@ TEST(SimulatorDrill, RiskCoreFlattensOnFloatingLossUnderHostileSim) {
 
   for (int i = 0; i < 50; ++i) send_tick(60'000.0 + (i % 5) * 10.0);
 
-  // Open a long.
-  auto intent = mk_long_intent(60'000.0, 59'700.0);
+  // Open a long. The intent is deliberately oversized (1 BTC): the RiskEngine
+  // treats intent qty as a ceiling and clamps it down to the headroom-based risk
+  // budget (~0.167 BTC here), which is the position the kill switch must react to.
+  schemas::v1::IntentV1 intent;
   auto decision = engine.evaluate(intent);
-  ASSERT_NE(decision.outcome, schemas::v1::RiskOutcomeV1::Reject)
-      << "reason=" << static_cast<int>(decision.reason);
-  ASSERT_TRUE(decision.command.has_value());
-  auto report = om.execute(*decision.command);
-  ASSERT_TRUE(report.status == schemas::v1::ExecutionStatusV1::Accepted ||
-              report.status == schemas::v1::ExecutionStatusV1::NetworkError)
-      << "first send";
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    intent = mk_long_intent(60'000.0, 59'700.0, core::kNanoPerUnit);
+    decision = engine.evaluate(intent);
+    ASSERT_NE(decision.outcome, schemas::v1::RiskOutcomeV1::Reject)
+        << "reason=" << static_cast<int>(decision.reason);
+    EXPECT_EQ(decision.outcome, schemas::v1::RiskOutcomeV1::Resize)
+        << "sizing should clamp the oversized intent";
+    ASSERT_TRUE(decision.command.has_value());
+    auto report = om.execute(*decision.command);
+    if (report.status != schemas::v1::ExecutionStatusV1::NetworkError) {
+      ASSERT_TRUE(report.status == schemas::v1::ExecutionStatusV1::Accepted)
+          << "first send";
+      break;
+    }
+    // Synthetic 429: mint a fresh command (new TTL) and retry, mirroring
+    // OrderManager::retry_unresolved semantics.
+  }
 
-  // Adverse path: drop 3%. Each tick the simulator marks-to-market and publishes.
-  // The bus is drained by hand here to exercise the account update flow.
+  // Adverse path: drop ~7.5%. Each tick the simulator marks-to-market and
+  // publishes. The bus is drained by hand here to exercise the account update
+  // flow. Trip threshold is 70% of the 500 USDC overall DD = 350 USDC floating
+  // loss; the clamped ~0.167 BTC position crosses that after ~2100 USDC/BTC of
+  // adverse move (half that if the simulator dealt a partial fill).
   for (int i = 0; i < 100; ++i) {
-    const double price = 60'000.0 - i * 15.0;  // -1500 USDC over 100 ticks = -2.5%
+    const double price = 60'000.0 - i * 45.0;  // -4500 USDC over 100 ticks
     send_tick(price);
     bus.drain([&](core::Event& ev) {
       std::visit(
