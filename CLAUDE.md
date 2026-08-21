@@ -299,29 +299,31 @@ Integration:
 Strategies are deliberately not unit-tested. The drills exercise them through
 the simulator.
 
-## Wiring debts to settle before the next live run
+## Wiring debts — all settled (2026-08-21)
 
-The risk core is proven against the simulator. The live wiring still needs
-finishing:
+The risk core is proven against the simulator and the live wiring is complete:
 
-1. `src/app/trading_app.cpp` was written against the older RiskEngine API.
-   Update it to:
-   - Construct `StateMachine` and `Preflight` in `bootstrap()`.
-   - Pass `sm`, `ulid`, `hmac_secret`, and `RiskEngine::Config` to the
-     `RiskEngine` constructor.
-   - Use `PropreHttpExecutor` (live) or `sim::SimExecutor` (`--sim` flag).
-   - Mint a per-session HMAC secret if `hmac_secret` config is blank.
-   - Run `Preflight::run()`. Transition `RECONCILING -> LIVE` only on green.
-2. `app/main.cpp` needs an `--sim` flag (drive simulator without REST/WS).
-3. `backtest/main.cpp` needs to be updated to construct the new RiskEngine and
-   use `IntentV1` / `RiskDecisionV1`.
-4. `src/net/propr_ws.cpp` only translates `account.updated` today. Translate
-   `order.*`, `position.*`, `trade.created` once we have one real payload of
-   each to confirm field names against.
-5. The `cancel-all` endpoint path (`/orders/cancel-all`) is a guess. Confirm
-   against `propr.xyz/docs/bot` before live trading.
-6. Top-level `vcpkg.json` has a placeholder `builtin-baseline`. Replace with a
-   real SHA from `microsoft/vcpkg`.
+1. ~~`trading_app.cpp` on the old RiskEngine API~~ — done: StateMachine/Preflight
+   members, new ctor, per-session HMAC minting, preflight-gated LIVE.
+2. ~~`--sim` flag~~ — done: `propr_agent --sim [--ticks N] [--seed S]
+   [--strategy PATH] [--params PATH]` runs the full pipeline over seeded
+   synthetic ticks via `app::SimRunner` + `core::SimClock`. No REST/WS/API key.
+3. ~~backtest on the old API~~ — done: `propr_backtest` executes
+   `RiskDecisionV1.command`, models stop/TP brackets, UTC-midnight daily resets,
+   and kill-switch halts. `--gen-sample N OUT` writes deterministic CSV data.
+4. ~~propr_ws translations~~ — done and confirmed against propr-docs:
+   `account.updated`, all six `position.*`, `trade.created` translated;
+   `order.*` logged for observability.
+5. ~~cancel-all endpoint guess~~ — resolved: the bulk endpoint does NOT exist.
+   Flatten lists open orders and cancels each via the documented
+   `POST /accounts/{id}/orders/{orderId}/cancel` (accepts 200/201; 400 =
+   already dead = fine).
+6. ~~vcpkg placeholder baseline~~ — real pinned SHA.
+
+Preflight registers all ten documented gates. The WS-disconnect kill switch is
+re-enabled with an exposure gate: silence only arms it while positions are
+open (quiet paper accounts legitimately receive no traffic); socket-level
+disconnects go BLIND immediately and reconcile back on reconnect.
 
 ## Gotchas to never forget
 

@@ -14,6 +14,23 @@ make build
 make test
 ```
 
+## Offline modes (no API key, no network)
+
+```bash
+# Simulator session: full risk pipeline over seeded synthetic ticks.
+build/app/propr_agent --sim --ticks 3000 --seed 7
+
+# Backtest: replay CSV (ts_ns,base,mark_price) through the same risk core.
+build/backtest/propr_backtest --gen-sample 3000 data/sample_btc.csv
+build/backtest/propr_backtest \
+  --strategy build/strategies/range_mr/range_mr \
+  --params strategies/range_mr/params.yaml --data data/sample_btc.csv
+```
+
+`--sim` is the runtime twin of the simulator drills: watch a strategy trade
+under the real risk envelope (sizing, leverage caps, kill switches, signed
+commands) before any paper/live deployment.
+
 ## Layout
 
 | Path | What lives there |
