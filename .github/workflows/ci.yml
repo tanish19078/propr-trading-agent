@@ -48,10 +48,13 @@ jobs:
       - name: Publish test failures to summary
         if: failure()
         run: |
+          # Failed-test lines as error annotations (public via checks API).
+          grep -E "\[  FAILED  \]" /tmp/ctest_output.txt | head -n 9 |
+            while read -r line; do echo "::error::$line"; done
           {
-            echo "## ctest output"
+            echo "## ctest tail"
             echo '```'
-            grep -v "^\[==========\]" /tmp/ctest_output.txt | tail -n 400
+            tail -n 250 /tmp/ctest_output.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
