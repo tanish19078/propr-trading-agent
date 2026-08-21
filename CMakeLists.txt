@@ -77,24 +77,23 @@ if(NOT SQLiteCpp_FOUND)
   FetchContent_MakeAvailable(SQLiteCpp)
 endif()
 
-# concurrentqueue: header-only MPSC queue.
-find_package(unofficial-concurrentqueue CONFIG QUIET)
-if(NOT unofficial-concurrentqueue_FOUND)
-  FetchContent_Declare(concurrentqueue
-    GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
-    GIT_TAG v1.0.4
-    GIT_SHALLOW ON)
-  FetchContent_MakeAvailable(concurrentqueue)
-  # FetchContent doesn't always emit the namespaced alias the repo expects;
-  # synthesise an INTERFACE target named `unofficial::concurrentqueue::concurrentqueue`
-  # so the rest of the project keeps the same link line on every host.
-  if(NOT TARGET unofficial::concurrentqueue::concurrentqueue)
-    add_library(_propr_concurrentqueue INTERFACE)
-    target_include_directories(_propr_concurrentqueue INTERFACE
-      ${concurrentqueue_SOURCE_DIR})
-    add_library(unofficial::concurrentqueue::concurrentqueue ALIAS
-      _propr_concurrentqueue)
-  endif()
+# concurrentqueue: header-only MPSC queue. Always fetched from source - the
+# vcpkg port installs headers under a different layout than the upstream repo,
+# which broke <concurrentqueue.h> includes on Linux CI.
+FetchContent_Declare(concurrentqueue
+  GIT_REPOSITORY https://github.com/cameron314/concurrentqueue.git
+  GIT_TAG v1.0.4
+  GIT_SHALLOW ON)
+FetchContent_MakeAvailable(concurrentqueue)
+# FetchContent doesn't always emit the namespaced alias the repo expects;
+# synthesise an INTERFACE target named `unofficial::concurrentqueue::concurrentqueue`
+# so the rest of the project keeps the same link line on every host.
+if(NOT TARGET unofficial::concurrentqueue::concurrentqueue)
+  add_library(_propr_concurrentqueue INTERFACE)
+  target_include_directories(_propr_concurrentqueue INTERFACE
+    ${concurrentqueue_SOURCE_DIR})
+  add_library(unofficial::concurrentqueue::concurrentqueue ALIAS
+    _propr_concurrentqueue)
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
