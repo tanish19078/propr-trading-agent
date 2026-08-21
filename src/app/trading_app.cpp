@@ -585,6 +585,14 @@ void TradingApp::on_event_(core::Event& ev) {
           }
         } else if constexpr (std::is_same_v<T, core::WsDisconnect>) {
           PROPR_LOG_WARN(std::string{R"({"ws_disconnect":")"} + e.ws_name + R"("})");
+          // Socket-level drop: block new entries immediately. From LIVE only -
+          // bootstrap tolerates flaky sockets while RECONCILING, and HALTED is
+          // terminal. If exposure exists and the feed stays dead past the
+          // silence threshold, the kill-switch path below flattens; a quick
+          // reconnect instead reconciles back to LIVE (WsReconnect handler).
+          if (sm_.state() == AppState::Live) {
+            sm_.transition(AppState::Blind);
+          }
         } else if constexpr (std::is_same_v<T, core::WsReconnect>) {
           PROPR_LOG_INFO(std::string{R"({"ws_reconnect":")"} + e.ws_name + R"("})");
           // On reconnect, re-fetch account state and re-enter LIVE if currently BLIND.
