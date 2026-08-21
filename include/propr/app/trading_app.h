@@ -54,6 +54,11 @@ class TradingApp {
   StateMachine& state_machine() { return sm_; }
   strategy::MarketSnapshot& snapshot() { return snapshot_; }
 
+  // Platform leverage caps from GET /leverage-limits/effective. Zero until
+  // bootstrap fetches them; preflight refuses LIVE while zero.
+  int platform_max_leverage_btc_eth() const { return platform_max_lev_btc_eth_; }
+  int platform_max_leverage_other() const { return platform_max_lev_other_; }
+
  private:
   void tick_();
   void on_event_(core::Event& ev);
@@ -90,6 +95,9 @@ class TradingApp {
   exec::Reconciler reconciler_;
 
   risk::RiskEngine risk_engine_;
+
+  int platform_max_lev_btc_eth_{0};
+  int platform_max_lev_other_{0};
 
   strategy::PluginLoader plugins_;
   strategy::MarketSnapshot snapshot_;

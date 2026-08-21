@@ -256,6 +256,28 @@ bool TradingApp::bootstrap() {
     translate_propr_response_to_account_(*acct);
   }
 
+  // 3b. Effective platform leverage limits (public, no auth). Response shape:
+  //     {"defaultMax": 2, "overrides": {"BTC": 5, "ETH": 5}}. Internal caps in
+  //     runtime.yaml must sit strictly below these; the preflight gate enforces it.
+  if (auto lim = http_.get("/leverage-limits/effective")) {
+    const int def = lim->contains("defaultMax") && (*lim)["defaultMax"].is_number()
+                        ? (*lim)["defaultMax"].get<int>()
+                        : 0;
+    int btc = def, eth = def;
+    if (lim->contains("overrides") && (*lim)["overrides"].is_object()) {
+      btc = (*lim)["overrides"].value("BTC", def);
+      eth = (*lim)["overrides"].value("ETH", def);
+    }
+    platform_max_lev_other_ = def;
+    platform_max_lev_btc_eth_ = std::min(btc, eth);
+    PROPR_LOG_INFO(std::string{R"({"leverage_limits":{"btc_eth":)" +
+                    std::to_string(platform_max_lev_btc_eth_) +
+                    R"(,"other":)" + std::to_string(platform_max_lev_other_) +
+                    R"("}})"});
+  } else {
+    PROPR_LOG_WARN(R"({"leverage_limits_fetch_failed":true})");
+  }
+
   // 4. Daily snapshot.
   if (auto last = journal_.last_snapshot("daily_reset")) {
     const auto today_midnight = core::Clock::last_utc_midnight_ns(clock_.now_ns());
