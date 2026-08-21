@@ -178,6 +178,33 @@ void TradingApp::register_preflight_gates_() {
                  [this] { return risk_engine_.daily_snapshot() > 0; },
                  [] { return "daily snapshot not set"; });
 
+  preflight_.add("rest_ws_reconciled",
+                 [this] {
+                   auto acct = http_.get("/accounts/" + account_.id().value);
+                   if (!acct) return false;
+                   bool hb = false, hu = false, hi = false;
+                   const core::Money bal = money_from(*acct, "balance", &hb);
+                   const core::Money upnl =
+                       money_from(*acct, "totalUnrealizedPnl", &hu);
+                   const core::Money iso =
+                       money_from(*acct, "isolatedPositionMargin", &hi);
+                   if (!hb || !hu || !hi) return false;
+                   // Equity computed from the wire, compared against the running
+                   // mirror WITHOUT mutating it. Tolerance: $1 or 5bps of
+                   // equity, whichever is larger - drift beyond that means the
+                   // WS mirror missed events and we must not go LIVE.
+                   const core::Money rest_eq = bal + upnl + iso;
+                   const core::Money mirror_eq = account_.equity();
+                   const core::Money tol =
+                       std::max<core::Money>(core::usdc(1),
+                                             mirror_eq / 2000);
+                   __int128 diff = static_cast<__int128>(rest_eq) -
+                                   static_cast<__int128>(mirror_eq);
+                   if (diff < 0) diff = -diff;
+                   return diff <= static_cast<__int128>(tol);
+                 },
+                 [] { return "REST snapshot diverged from WS mirror"; });
+
   preflight_.add("journal_writable",
                  [this] {
                    try {
