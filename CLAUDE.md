@@ -325,24 +325,14 @@ re-enabled with an exposure gate: silence only arms it while positions are
 open (quiet paper accounts legitimately receive no traffic); socket-level
 disconnects go BLIND immediately and reconcile back on reconnect.
 
-## Known issues — open
+## Known issues
 
-1. **CI: `StrategySim.CompareAcrossRegimes` fails on Linux only** (Windows
-   green, 68/68). Build passes; this one test fails. Evidence so far:
-   - Regime tapes are now bit-identical cross-platform (SplitMix64 +
-     Box-Muller replaced the implementation-defined `std::normal_distribution`
-     stream) — did NOT fix it.
-   - Prime suspect: strategy plugins build with `CXX_VISIBILITY_PRESET hidden`
-     and the `extern "C" create_strategy` factory carries no ELF visibility
-     annotation. On Windows `__declspec(dllexport)` is not needed (all symbols
-     exported by default), on Linux `dlsym("create_strategy")` likely returns
-     null → PluginLoader reports load-failed → EXPECT_NE fires.
-   - Fix when picked up: add a visibility macro to `strategy.h`
-     (`__attribute__((visibility("default")))` under non-Windows when
-     `PROPR_PLUGIN_BUILD` is defined), apply to both factories in all four
-     plugins. Verify with `nm -D build/strategies/range_mr/range_mr.so`.
-   - ctest exits 8 for this single failure on Linux runners; treat exit code
-     as boolean until understood.
+None open. (2026-08-21) `StrategySim.CompareAcrossRegimes` failed on Linux only:
+plugins built with `CXX_VISIBILITY_PRESET hidden` but the `extern "C"` factories
+carried no ELF visibility annotation, so `dlsym("create_strategy")` returned
+null and every plugin load failed. Fixed via `PROPR_PLUGIN_API` in
+`strategy.h` (commit 36ac007). Regime tapes were also made bit-identical
+cross-platform along the way (SplitMix64 + Box-Muller in `sim_harness.h`).
 
 ## Gotchas to never forget
 
