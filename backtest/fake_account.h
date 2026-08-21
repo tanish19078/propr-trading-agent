@@ -1,20 +1,19 @@
 #pragma once
 
-// PARKED. This translation unit references the pre-V1 `strategy::Intent` type
-// that has been replaced by `schemas::v1::IntentV1`. The whole backtest target
-// is excluded from CMake until it is ported. Do not re-enable
-// `add_subdirectory(backtest)` until this file builds against the V1 schemas.
+// Fill/P&L simulator for offline backtests. Mirrors a Propr account into an
+// account::Account so the real RiskEngine sizes against live-looking equity.
+// Net-position ledger per base asset; shorts fall out of the same arithmetic
+// (negative qty, negative cost) without special-casing.
 
 #include <unordered_map>
 #include <vector>
 
 #include "propr/account/account.h"
 #include "propr/core/types.h"
-// #include "propr/strategy/intent.h"  // REMOVED - file no longer exists.
+#include "propr/schemas/v1.h"
 
 namespace propr::backtest {
 
-// Simulates fills, fees, and slippage for offline backtests. Mirrors a Propr account.
 class FakeAccount {
  public:
   struct Config {
@@ -29,7 +28,7 @@ class FakeAccount {
   }
 
   // Simulate filling a single approved-intent entry leg.
-  void simulate_entry(const strategy::Intent& intent, core::Price mark);
+  void simulate_entry(const schemas::v1::IntentV1& intent, core::Price mark);
 
   // Mark current open positions to a new tick — updates unrealized PnL and HWM.
   void mark_to_tick(const core::Asset& asset, core::Price mark);

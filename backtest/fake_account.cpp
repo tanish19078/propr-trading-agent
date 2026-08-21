@@ -5,30 +5,29 @@
 namespace propr::backtest {
 
 namespace {
-core::Price slip(core::Price mark, int bps, propr::core::Side side) {
+core::Price slip(core::Price mark, int bps, bool is_buy) {
   const double factor = (bps / 10000.0);
-  return side == propr::core::Side::Buy
-             ? static_cast<core::Price>(mark * (1.0 + factor))
-             : static_cast<core::Price>(mark * (1.0 - factor));
+  return is_buy ? static_cast<core::Price>(mark * (1.0 + factor))
+                : static_cast<core::Price>(mark * (1.0 - factor));
 }
 }  // namespace
 
-void FakeAccount::simulate_entry(const strategy::Intent& intent, core::Price mark) {
-  if (intent.kind != strategy::Intent::Kind::OpenLong &&
-      intent.kind != strategy::Intent::Kind::OpenShort) {
-    return;
-  }
-  const auto side = strategy::side_for(intent.kind);
-  const core::Price fill = slip(mark, cfg_.slippage_bps, side);
-  const core::Money notional = core::notional(fill, intent.quantity);
+void FakeAccount::simulate_entry(const schemas::v1::IntentV1& intent,
+                                 core::Price mark) {
+  const bool is_long = intent.kind == schemas::v1::IntentKindV1::OpenLong;
+  const bool is_short = intent.kind == schemas::v1::IntentKindV1::OpenShort;
+  if (!is_long && !is_short) return;
+
+  const core::Price fill = slip(mark, cfg_.slippage_bps, is_long);
+  const core::Money notional = core::notional(fill, intent.quantity_nano);
   const core::Money fee = (notional * cfg_.taker_fee_bps) / 10000;
   balance_ -= fee;
-  auto& h = holdings_[intent.asset.base];
+  auto& h = holdings_[intent.asset_base];
   const core::Money new_cost = h.entry_cost + notional;
-  const core::Qty new_qty = h.qty + intent.quantity;
+  const core::Qty new_qty = h.qty + intent.quantity_nano;
   h.entry_cost = new_cost;
   h.qty = new_qty;
-  h.avg_entry = new_qty > 0
+  h.avg_entry = new_qty != 0
                     ? static_cast<core::Price>(new_cost * core::kNanoPerUnit / new_qty)
                     : 0;
 }
