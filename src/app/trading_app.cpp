@@ -205,6 +205,15 @@ void TradingApp::register_preflight_gates_() {
                  },
                  [] { return "REST snapshot diverged from WS mirror"; });
 
+  preflight_.add("market_feed_live",
+                 [this] {
+                   const auto last = hl_ws_.last_event_ns();
+                   if (last == 0) return false;  // never received a tick
+                   constexpr std::int64_t kStaleNs = 30LL * 1'000'000'000LL;
+                   return clock_.now_ns() - last <= kStaleNs;
+                 },
+                 [] { return "no Hyperliquid market event within 30s"; });
+
   preflight_.add("journal_writable",
                  [this] {
                    try {
