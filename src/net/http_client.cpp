@@ -14,6 +14,11 @@ core::Result<HttpClient::Json> HttpClient::get(
   return do_request_("GET", path, query, nullptr, risk::RateLimiter::Class::Normal);
 }
 
+core::Result<HttpClient::Json> HttpClient::get_reserved(
+    std::string_view path, const std::unordered_map<std::string, std::string>& query) {
+  return do_request_("GET", path, query, nullptr, risk::RateLimiter::Class::Reserved);
+}
+
 core::Result<HttpClient::Json> HttpClient::post(std::string_view path, const Json& body) {
   return do_request_("POST", path, {}, &body, risk::RateLimiter::Class::Normal);
 }

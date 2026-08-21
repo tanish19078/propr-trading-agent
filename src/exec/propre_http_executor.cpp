@@ -93,35 +93,48 @@ ExecutionReportV1 PropreHttpExecutor::cancel_all() {
   ExecutionReportV1 r;
   r.at_ns = clock_.now_ns();
 
-  // Try the bulk cancel-all endpoint first (may not exist on all Propr deployments).
-  const std::string bulk_path = "/accounts/" + account_.id().value + "/orders/cancel-all";
-  auto bulk_resp = http_.post_reserved(bulk_path, nlohmann::json::object());
-  if (bulk_resp) {
-    r.status = ExecutionStatusV1::Cancelled;
-    r.detail = "bulk_cancel_all";
-    return r;
-  }
-
-  // Fallback: fetch open orders and cancel individually.
+  // The Propr API has no bulk cancel endpoint (verified against propr-docs).
+  // Flatten = list open orders, then cancel each via
+  // POST /accounts/{id}/orders/{orderId}/cancel. All calls burn the Reserved
+  // rate bucket so an emergency flatten cannot be starved by normal traffic.
   std::unordered_map<std::string, std::string> query{{"status", "open"}};
-  auto orders_resp = http_.get("/accounts/" + account_.id().value + "/orders", query);
+  auto orders_resp =
+      http_.get_reserved("/accounts/" + account_.id().value + "/orders", query);
   if (!orders_resp) {
     r.status = ExecutionStatusV1::NetworkError;
-    r.detail = "cancel_all_fallback_failed: " + orders_resp.error().message;
+    r.detail = "cancel_all_list_failed: " + orders_resp.error().message;
     return r;
   }
 
   int cancelled = 0;
+  int failed = 0;
   if (orders_resp->contains("data") && (*orders_resp)["data"].is_array()) {
     for (const auto& order : (*orders_resp)["data"]) {
       if (!order.contains("orderId")) continue;
       const std::string order_id = order["orderId"];
-      const std::string cancel_path = "/accounts/" + account_.id().value + "/orders/" + order_id;
-      auto cancel_resp = http_.delete_reserved(cancel_path);
-      if (cancel_resp) ++cancelled;
+      const std::string cancel_path = "/accounts/" + account_.id().value +
+                                      "/orders/" + order_id + "/cancel";
+      auto cancel_resp = http_.post_reserved(cancel_path, nlohmann::json::object());
+      if (cancel_resp) {
+        ++cancelled;
+        continue;
+      }
+      // 400 means already filled/cancelled/expired - safe to ignore (docs).
+      const auto& err = cancel_resp.error();
+      if (err.code == core::Error::Code::HttpError && err.http_status == 400) {
+        ++cancelled;
+        continue;
+      }
+      ++failed;
     }
   }
 
+  if (failed > 0) {
+    r.status = ExecutionStatusV1::NetworkError;
+    r.detail = "cancelled_" + std::to_string(cancelled) + "_failed_" +
+               std::to_string(failed);
+    return r;
+  }
   r.status = ExecutionStatusV1::Cancelled;
   r.detail = "cancelled_" + std::to_string(cancelled) + "_orders";
   return r;

@@ -28,6 +28,9 @@ class HttpClient {
 
   virtual core::Result<Json> get(std::string_view path,
                                  const std::unordered_map<std::string, std::string>& query = {});
+  virtual core::Result<Json> get_reserved(
+      std::string_view path,
+      const std::unordered_map<std::string, std::string>& query = {});
   virtual core::Result<Json> post(std::string_view path, const Json& body);
   virtual core::Result<Json> post_reserved(std::string_view path, const Json& body);
   virtual core::Result<Json> del(std::string_view path);
